@@ -1,0 +1,42 @@
+workflows:
+  ios-testflight:
+    name: Six Seven Aura Farm - internal TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    integrations:
+      app_store_connect: Pocket Codex Codemagic
+    environment:
+      vars:
+        APP_STORE_APPLE_ID: "6811652035"
+      xcode: "26.0"
+      node: "24"
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.sixtyseven.clicker
+    scripts:
+      - name: Validate app registration
+        script: |
+          set -euo pipefail
+          [[ "$APP_STORE_APPLE_ID" =~ ^[0-9]+$ ]] || { echo "Set the numeric App Store Connect app ID before building."; exit 1; }
+      - name: Build and verify bundled game
+        script: |
+          set -euo pipefail
+          npm ci
+          npm run lint
+          npm run build:web
+          npx cap sync ios
+          python3 tools/check-ios-bundle.py
+          python3 tools/test_testflight_release.py
+      - name: Allocate Apple build number
+        script: python3 tools/testflight-release.py number --app-id "$APP_STORE_APPLE_ID"
+      - name: Sign and archive for internal testing
+        script: |
+          set -euo pipefail
+          python3 tools/prepare-release.py
+          xcode-project use-profiles --custom-export-options='{"testFlightInternalTestingOnly": true}'
+          xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+      - name: Upload once to TestFlight
+        script: python3 tools/testflight-release.py upload --app-id "$APP_STORE_APPLE_ID" --ipa build/ios/ipa/App.ipa
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log

@@ -51,3 +51,10 @@ next-env.d.ts
 /android/local.properties
 /android/*.keystore
 /android/*.jks
+
+# Python release-tool caches and local Apple signing material
+__pycache__/
+*.pyc
+*.p8
+*.p12
+*.mobileprovision
